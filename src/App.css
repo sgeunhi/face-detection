@@ -12,9 +12,8 @@
     animation: App-logo-spin infinite 20s linear;
   }
 }
-
 .App-header {
-  background-color: #282c34;
+  background-color: #2f4776;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -37,6 +36,57 @@
   }
 }
 
+.header {
+  background-color: #2f4776;
+  display: flex;
+  padding: 10px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: #ffffff;
+}
+.body {
+  display: flex;
+  felx : 1;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  /* font-size: calc(10px + 2vmin); */
+  color: #2f4776;
+}
+.left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  /* font-size: calc(10px + 2vmin); */
+  color: #2f4776;
+}
+.left-header
+.left-body{
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  /* font-size: calc(10px + 2vmin); */
+  color: #2f4776;
+}
+.right {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  /* font-size: calc(10px + 2vmin); */
+  color: #2f4776;
+}
+.content {
+  /* background-color: #282c34; */
+  /* display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center; */
+}
 .canvas {
   z-index: 1;
   position: absolute;
