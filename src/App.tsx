@@ -14,7 +14,6 @@ let poseLandmarker: PoseLandmarker;
 let video: HTMLVideoElement;
 let canvas: HTMLCanvasElement;
 let lastVideoTime = -1;
-// let pose: string;
 
 function App() {
   // const webCamRef = useRef<Webcam>(null);
@@ -24,6 +23,8 @@ function App() {
     useState<String>("자세 인식 시작하기");
   const [webCamRunning, setWebCamRunning] = useState<Boolean>(false);
   const [poseText, setPoseText] = useState<String>("정면");
+  const [angle, setAngle] = useState<number>(0);
+  const [angleText, setAngleText] = useState<String>("왼쪽 다리를 뻗어주세요");
   // 모델 로드
   const createPoseLandmarker = async () => {
     const vision = await FilesetResolver.forVisionTasks(
@@ -96,7 +97,19 @@ function App() {
               lineWidth: 1,
             }
           );
-          poseEstimation(landmark);
+          const angle = getAngle(landmark);
+          if (angle < 100) {
+            setAngleText("왼쪽 다리를 뻗어주세요");
+          } else if (angle > 120 && angle < 130) {
+            setAngleText("왼쪽 다리를 더 뻗어주세요");
+          } else if (angle > 130) {
+            setAngleText("자세를 4초간 유지해주세요");
+            setTimeout(() => {
+              setAngleText("다리를 내려주세요");
+            }, 4000);
+          }
+
+          // poseEstimation(landmark);
           // if (pose === "오른쪽") {
           //   alert("오른쪽을 바라보고 있습니다");
           // } else if (pose === "왼쪽") {
@@ -120,8 +133,9 @@ function App() {
   };
 
   const poseEstimation = (landmark: NormalizedLandmark[]) => {
-    // 양쪽 어깨 곱이 음수이면 오른쪽 혹은 왼쪽을 바라보고 있는 것
+    // 양쪽 어깨 z 좌표 곱이 음수이면 오른쪽 혹은 왼쪽을 바라보고 있는 것
     if (Math.sign(landmark[11].z * landmark[12].z) < 0) {
+      // 왼쪽 어깨 z 좌표가 더 크면 왼쪽을 바라보고 있는 것
       if (landmark[11].z > landmark[12].z) {
         console.log("왼쪽");
         setPoseText("왼쪽");
@@ -132,6 +146,7 @@ function App() {
     }
     // 양수이면 정면 혹은 후면을 바라보고 있는 것
     else {
+      // 왼쪽 어깨 x 좌표가 더 크면 정면을 바라보고 있는 것
       if (landmark[11].x > landmark[12].x) {
         console.log("정면");
         setPoseText("정면");
@@ -140,35 +155,36 @@ function App() {
         setPoseText("후면");
       }
     }
-    // if (
-    //   // landmark[0].z < landmark[7].z &&
-    //   landmark[7].x - landmark[8].x < 0.1 &&
-    //   landmark[8].z > landmark[7].z &&
-    //   landmark[11].z < landmark[12].z
-    // ) {
-    //   console.log("오른쪽");
-    //   setPoseText("오른쪽");
-    //   // return "오른쪽";
-    // } else if (
-    //   // landmark[0].z < landmark[7].z &&
-    //   landmark[7].x - landmark[8].x < 0.1 &&
-    //   landmark[8].z < landmark[7].z &&
-    //   landmark[11].z > landmark[12].z
-    // ) {
-    //   console.log("왼쪽");
-    //   setPoseText("왼쪽");
-    //   return "왼쪽";
-    // } else if (
-    //   landmark[7].x < landmark[8].x &&
-    //   landmark[11].x < landmark[12].x
-    // ) {
-    //   console.log("후면");
-    //   setPoseText("후면");
-    //   return "후면";
-    // }
-    // console.log("정면");
-    // setPoseText("정면");
-    // return "정면";
+  };
+
+  const getAngle = (landmark: NormalizedLandmark[]) => {
+    const rightHip = landmark[23];
+    const rightKnee = landmark[25];
+    const rightAnkle = landmark[27];
+
+    // 두 점 사이의 벡터 계산
+    const vector1 = {
+      x: rightHip.x - rightKnee.x,
+      y: rightHip.y - rightKnee.y,
+    };
+    const vector2 = {
+      x: rightAnkle.x - rightKnee.x,
+      y: rightAnkle.y - rightKnee.y,
+    };
+
+    // 각 벡터의 크기 계산
+    const magnitude1 = Math.sqrt(vector1.x * vector1.x + vector1.y * vector1.y);
+    const magnitude2 = Math.sqrt(vector2.x * vector2.x + vector2.y * vector2.y);
+
+    // 두 벡터의 내적 계산
+    const dotProduct = vector1.x * vector2.x + vector1.y * vector2.y;
+
+    // 각도 계산 (라디안 값을 도 단위로 변환)
+    const angleRad = Math.acos(dotProduct / (magnitude1 * magnitude2));
+    const angleDeg = angleRad * (180 / Math.PI);
+    setAngle(Math.round(angleDeg));
+    console.log("각도", Math.round(angleDeg));
+    return angleDeg;
   };
 
   useEffect(() => {
@@ -178,7 +194,7 @@ function App() {
   return (
     <div className="App">
       <div className="header">
-        <h2>기술 트렌드와 사업기회 분석</h2>
+        <h2>벤처창업론</h2>
         <div style={{ fontWeight: "bold" }}>
           MediaPipe PoseLandemarker task를 활용한 Pose detection
         </div>
@@ -204,7 +220,11 @@ function App() {
         <Button
           variant="contained"
           onClick={enableWebCam}
-          style={{ marginBottom: "10px" }}
+          style={{
+            marginBottom: "10px",
+            color: "ffffff",
+            backgroundColor: "#000000",
+          }}
         >
           {enableWebcamButtonText}
         </Button>
@@ -260,7 +280,7 @@ function App() {
               height: 480,
             }}
           />
-          <div
+          {/* <div
             style={{
               position: "absolute",
               marginLeft: "auto",
@@ -273,11 +293,12 @@ function App() {
               height: 480,
               fontSize: "50px",
               fontWeight: "bold",
-              color: "#0055ff",
+              color:
+                angleText === "왼쪽 다리를 더 뻗어주세요" ? "red" : "black",
             }}
           >
-            {poseText}
-          </div>
+            {angleText}
+          </div> */}
         </div>
       </div>
     </div>
