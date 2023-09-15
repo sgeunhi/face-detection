@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import "./App.css";
 import {
   PoseLandmarker,
@@ -6,8 +6,7 @@ import {
   FilesetResolver,
   NormalizedLandmark,
 } from "@mediapipe/tasks-vision";
-import Webcam from "react-webcam";
-import { Alert, Button } from "@mui/material";
+import { Button } from "@mui/material";
 
 type RunningMode = "IMAGE" | "VIDEO";
 let poseLandmarker: PoseLandmarker;
@@ -16,8 +15,6 @@ let canvas: HTMLCanvasElement;
 let lastVideoTime = -1;
 
 function App() {
-  // const webCamRef = useRef<Webcam>(null);
-  // const canvasRef = useRef<HTMLCanvasElement>(null);
   const [runningMode, setRunningMode] = useState<RunningMode>("IMAGE");
   const [enableWebcamButtonText, setEnableWebcamButtonText] =
     useState<String>("자세 인식 시작하기");
@@ -25,6 +22,7 @@ function App() {
   const [poseText, setPoseText] = useState<String>("정면");
   const [angle, setAngle] = useState<number>(0);
   const [angleText, setAngleText] = useState<String>("왼쪽 다리를 뻗어주세요");
+
   // 모델 로드
   const createPoseLandmarker = async () => {
     const vision = await FilesetResolver.forVisionTasks(
@@ -109,12 +107,6 @@ function App() {
             }, 4000);
           }
 
-          // poseEstimation(landmark);
-          // if (pose === "오른쪽") {
-          //   alert("오른쪽을 바라보고 있습니다");
-          // } else if (pose === "왼쪽") {
-          //   alert("왼쪽을 바라보고 있습니다");
-          // }
           canvasCtx.restore();
         }
       });
@@ -193,12 +185,12 @@ function App() {
 
   return (
     <div className="App">
-      <div className="header">
+      {/* <div className="header">
         <h2>벤처창업론</h2>
         <div style={{ fontWeight: "bold" }}>
           MediaPipe PoseLandemarker task를 활용한 Pose detection
         </div>
-      </div>
+      </div> */}
       <div className="body">
         <div className="left">
           <div
@@ -250,22 +242,7 @@ function App() {
             autoPlay
             playsInline
           ></video>
-          {/* <Webcam
-            ref={webCamRef}
-            style={{
-              position: "absolute",
-              marginLeft: "auto",
-              marginRight: "auto",
-              left: 0,
-              right: 0,
-              textAlign: "center",
-              zIndex: 9,
-              width: 640,
-              height: 480,
-            }}
-          /> */}
           <canvas
-            // ref={canvasRef}
             id="canvas"
             className="output_canvas"
             style={{
