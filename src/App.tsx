@@ -1,42 +1,49 @@
 import React, { useEffect, useState } from "react";
 import "./App.css";
+// import { Matrix4, Euler } from "three";
 import {
-  PoseLandmarker,
+  FaceLandmarker,
   DrawingUtils,
   FilesetResolver,
-  NormalizedLandmark,
+  // NormalizedLandmark,
+  FaceLandmarkerOptions,
+  // FaceLandmarkerResult,
 } from "@mediapipe/tasks-vision";
-import { Button } from "@mui/material";
+// import { Button } from "@mui/material";
 
-type RunningMode = "IMAGE" | "VIDEO";
-let poseLandmarker: PoseLandmarker;
+let faceLandmarker: FaceLandmarker;
 let video: HTMLVideoElement;
+let faceLandmarks: any[] = [];
 let canvas: HTMLCanvasElement;
 let lastVideoTime = -1;
+// let blendshapes: any[] = [];
+// let rotation: Euler;
+
+const options: FaceLandmarkerOptions = {
+  baseOptions: {
+    modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
+    delegate: "GPU",
+  },
+  numFaces: 1,
+  runningMode: "VIDEO",
+  outputFaceBlendshapes: true,
+};
 
 function App() {
-  const [runningMode, setRunningMode] = useState<RunningMode>("IMAGE");
   const [enableWebcamButtonText, setEnableWebcamButtonText] =
-    useState<String>("자세 인식 시작하기");
+    useState<String>("얼굴 인식 시작하기");
   const [webCamRunning, setWebCamRunning] = useState<Boolean>(false);
-  const [poseText, setPoseText] = useState<String>("정면");
-  const [angle, setAngle] = useState<number>(0);
-  const [angleText, setAngleText] = useState<String>("왼쪽 다리를 뻗어주세요");
 
   // 모델 로드
-  const createPoseLandmarker = async () => {
-    const vision = await FilesetResolver.forVisionTasks(
-      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
+  const createFaceLandmarker = async () => {
+    const filesetResolver = await FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
     );
 
-    poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
-      baseOptions: {
-        modelAssetPath: `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task`,
-        delegate: "CPU",
-      },
-      runningMode: runningMode,
-      numPoses: 1,
-    });
+    faceLandmarker = await FaceLandmarker.createFromOptions(
+      filesetResolver,
+      options
+    );
 
     video = document.getElementById("video") as HTMLVideoElement;
     const constraints = {
@@ -50,8 +57,9 @@ function App() {
 
   // 카메라 작동
   const enableWebCam = async () => {
-    if (!poseLandmarker) {
+    if (!faceLandmarker) {
       console.log("아직 모델이 로드되지 않았습니다.");
+      return;
     }
     if (webCamRunning) {
       setWebCamRunning(false);
@@ -63,163 +71,91 @@ function App() {
   };
 
   const predictWebCam = async () => {
-    console.log("predictWebCam");
-
     const startTimeMs = Date.now();
+
     canvas = document.getElementById("canvas") as HTMLCanvasElement;
     const canvasCtx = canvas.getContext("2d");
 
-    if (runningMode === "IMAGE") {
-      await poseLandmarker.setOptions({ runningMode: "VIDEO" });
-    }
-
     if (canvasCtx && lastVideoTime !== video.currentTime) {
       lastVideoTime = video.currentTime;
-      poseLandmarker.detectForVideo(video, startTimeMs, (result) => {
+
+      const faceLandmarkerResult = faceLandmarker.detectForVideo(
+        video,
+        startTimeMs
+      );
+      const drawingUtils = new DrawingUtils(canvasCtx);
+
+      if (
+        faceLandmarkerResult.faceBlendshapes &&
+        faceLandmarkerResult.faceBlendshapes.length > 0 &&
+        faceLandmarkerResult.faceBlendshapes[0].categories
+      ) {
         canvasCtx.save();
         canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
-        const drawingUtils = new DrawingUtils(canvasCtx);
-        for (const landmark of result.landmarks) {
-          const color = randomColor();
-          drawingUtils.drawLandmarks(landmark, {
-            radius: 2,
-            lineWidth: 0.5,
-            // 점들마다 색 다르게
-            color: color,
-          });
-          console.log("landmark", landmark);
+        // blendshapes = faceLandmarkerResult.faceBlendshapes[0].categories;
+        faceLandmarks = faceLandmarkerResult.faceLandmarks;
+        for (const landmarks of faceLandmarks) {
           drawingUtils.drawConnectors(
-            landmark,
-            PoseLandmarker.POSE_CONNECTIONS,
-            {
-              lineWidth: 1,
-            }
+            landmarks,
+            FaceLandmarker.FACE_LANDMARKS_TESSELATION,
+            { color: "#C0C0C070", lineWidth: 0.5 }
           );
-          const angle = getAngle(landmark);
-          if (angle < 100) {
-            setAngleText("왼쪽 다리를 뻗어주세요");
-          } else if (angle > 120 && angle < 130) {
-            setAngleText("왼쪽 다리를 더 뻗어주세요");
-          } else if (angle > 130) {
-            setAngleText("자세를 4초간 유지해주세요");
-            setTimeout(() => {
-              setAngleText("다리를 내려주세요");
-            }, 4000);
-          }
+          drawingUtils.drawConnectors(
+            landmarks,
+            FaceLandmarker.FACE_LANDMARKS_RIGHT_EYE,
+            { color: "#FF3030", lineWidth: 0.5 }
+          );
+          drawingUtils.drawConnectors(
+            landmarks,
+            FaceLandmarker.FACE_LANDMARKS_RIGHT_EYEBROW,
+            { color: "#FF3030", lineWidth: 0.5 }
+          );
+          drawingUtils.drawConnectors(
+            landmarks,
+            FaceLandmarker.FACE_LANDMARKS_LEFT_EYE,
+            { color: "#30FF30", lineWidth: 0.5 }
+          );
+          drawingUtils.drawConnectors(
+            landmarks,
+            FaceLandmarker.FACE_LANDMARKS_LEFT_EYEBROW,
+            { color: "#30FF30", lineWidth: 0.5 }
+          );
+          drawingUtils.drawConnectors(
+            landmarks,
+            FaceLandmarker.FACE_LANDMARKS_FACE_OVAL,
+            { color: "#E0E0E0", lineWidth: 0.1 }
+          );
+          drawingUtils.drawConnectors(
+            landmarks,
+            FaceLandmarker.FACE_LANDMARKS_LIPS,
+            { color: "#E0E0E0", lineWidth: 0.1 }
+          );
+          drawingUtils.drawConnectors(
+            landmarks,
+            FaceLandmarker.FACE_LANDMARKS_RIGHT_IRIS,
+            { color: "#FF3030", lineWidth: 0.1 }
+          );
+          drawingUtils.drawConnectors(
+            landmarks,
+            FaceLandmarker.FACE_LANDMARKS_LEFT_IRIS,
+            { color: "#30FF30", lineWidth: 0.1 }
+          );
 
           canvasCtx.restore();
         }
-      });
+      }
+      console.log(faceLandmarkerResult);
     }
-
     window.requestAnimationFrame(predictWebCam);
   };
 
-  const randomColor = () => {
-    const letters = "0123456789ABCDEF";
-    let color = "#";
-    for (let i = 0; i < 6; i++) {
-      color += letters[Math.floor(Math.random() * 16)];
-    }
-    return color;
-  };
-
-  const poseEstimation = (landmark: NormalizedLandmark[]) => {
-    // 양쪽 어깨 z 좌표 곱이 음수이면 오른쪽 혹은 왼쪽을 바라보고 있는 것
-    if (Math.sign(landmark[11].z * landmark[12].z) < 0) {
-      // 왼쪽 어깨 z 좌표가 더 크면 왼쪽을 바라보고 있는 것
-      if (landmark[11].z > landmark[12].z) {
-        console.log("왼쪽");
-        setPoseText("왼쪽");
-      } else {
-        console.log("오른쪽");
-        setPoseText("오른쪽");
-      }
-    }
-    // 양수이면 정면 혹은 후면을 바라보고 있는 것
-    else {
-      // 왼쪽 어깨 x 좌표가 더 크면 정면을 바라보고 있는 것
-      if (landmark[11].x > landmark[12].x) {
-        console.log("정면");
-        setPoseText("정면");
-      } else {
-        console.log("후면");
-        setPoseText("후면");
-      }
-    }
-  };
-
-  const getAngle = (landmark: NormalizedLandmark[]) => {
-    const rightHip = landmark[23];
-    const rightKnee = landmark[25];
-    const rightAnkle = landmark[27];
-
-    // 두 점 사이의 벡터 계산
-    const vector1 = {
-      x: rightHip.x - rightKnee.x,
-      y: rightHip.y - rightKnee.y,
-    };
-    const vector2 = {
-      x: rightAnkle.x - rightKnee.x,
-      y: rightAnkle.y - rightKnee.y,
-    };
-
-    // 각 벡터의 크기 계산
-    const magnitude1 = Math.sqrt(vector1.x * vector1.x + vector1.y * vector1.y);
-    const magnitude2 = Math.sqrt(vector2.x * vector2.x + vector2.y * vector2.y);
-
-    // 두 벡터의 내적 계산
-    const dotProduct = vector1.x * vector2.x + vector1.y * vector2.y;
-
-    // 각도 계산 (라디안 값을 도 단위로 변환)
-    const angleRad = Math.acos(dotProduct / (magnitude1 * magnitude2));
-    const angleDeg = angleRad * (180 / Math.PI);
-    setAngle(Math.round(angleDeg));
-    console.log("각도", Math.round(angleDeg));
-    return angleDeg;
-  };
-
   useEffect(() => {
-    createPoseLandmarker();
+    createFaceLandmarker();
   }, []);
 
   return (
     <div className="App">
-      {/* <div className="header">
-        <h2>벤처창업론</h2>
-        <div style={{ fontWeight: "bold" }}>
-          MediaPipe PoseLandemarker task를 활용한 Pose detection
-        </div>
-      </div> */}
-      <div className="body">
-        <div className="left">
-          <div
-            className="left-header"
-            style={{ fontWeight: "bold", fontSize: "20px", marginTop: "10px" }}
-          >
-            사용 방법
-          </div>
-          <div className="left-body">
-            <p>
-              1. 자세 인식 시작하기 버튼을 누르면 카메라가 작동합니다. <br />
-              2. 카메라가 작동하면 자세를 취해주세요. <br />
-              3. 자세를 취하면 자세가 인식됩니다. <br />
-            </p>
-          </div>
-        </div>
-      </div>
       <div className="content">
-        <Button
-          variant="contained"
-          onClick={enableWebCam}
-          style={{
-            marginBottom: "10px",
-            color: "ffffff",
-            backgroundColor: "#000000",
-          }}
-        >
-          {enableWebcamButtonText}
-        </Button>
         <div
           style={{
             position: "relative",
@@ -236,8 +172,8 @@ function App() {
               left: 0,
               right: 0,
               zIndex: 9,
-              width: 640,
-              height: 480,
+              width: 1000,
+              height: 800,
             }}
             autoPlay
             playsInline
@@ -253,29 +189,10 @@ function App() {
               right: 0,
               textAlign: "center",
               zIndex: 9,
-              width: 640,
-              height: 480,
+              width: 1000,
+              height: 800,
             }}
           />
-          {/* <div
-            style={{
-              position: "absolute",
-              marginLeft: "auto",
-              marginRight: "auto",
-              left: 0,
-              right: 0,
-              textAlign: "center",
-              zIndex: 9,
-              width: 640,
-              height: 480,
-              fontSize: "50px",
-              fontWeight: "bold",
-              color:
-                angleText === "왼쪽 다리를 더 뻗어주세요" ? "red" : "black",
-            }}
-          >
-            {angleText}
-          </div> */}
         </div>
       </div>
     </div>
