@@ -1,10 +1,15 @@
 import "./App.css";
 
 import React, { useEffect, useState } from "react";
-import { Color, Euler, Matrix4 } from 'three';
-import { Canvas, useFrame, useGraph } from '@react-three/fiber';
-import { FaceLandmarker, DrawingUtils, FilesetResolver, FaceLandmarkerOptions } from "@mediapipe/tasks-vision";
-import { useGLTF } from '@react-three/drei';
+import { Color, Euler, Matrix4 } from "three";
+import { Canvas, useFrame, useGraph } from "@react-three/fiber";
+import {
+  FaceLandmarker,
+  DrawingUtils,
+  FilesetResolver,
+  FaceLandmarkerOptions,
+} from "@mediapipe/tasks-vision";
+import { useGLTF } from "@react-three/drei";
 
 let faceLandmarker: FaceLandmarker;
 let video: HTMLVideoElement;
@@ -40,8 +45,8 @@ function Avatar({ url }: { url: string }) {
 
   useFrame(() => {
     if (blendshapes.length > 0) {
-      blendshapes.forEach(element => {
-        headMesh.forEach(mesh => {
+      blendshapes.forEach((element) => {
+        headMesh.forEach((mesh) => {
           let index = mesh.morphTargetDictionary[element.categoryName];
           if (index >= 0) {
             mesh.morphTargetInfluences[index] = element.score;
@@ -50,19 +55,29 @@ function Avatar({ url }: { url: string }) {
       });
 
       nodes.Head.rotation.set(rotation.x, rotation.y, rotation.z);
-      nodes.Neck.rotation.set(rotation.x / 5 + 0.3, rotation.y / 5, rotation.z / 5);
-      nodes.Spine2.rotation.set(rotation.x / 10, rotation.y / 10, rotation.z / 10);
+      nodes.Neck.rotation.set(
+        rotation.x / 5 + 0.3,
+        rotation.y / 5,
+        rotation.z / 5
+      );
+      nodes.Spine2.rotation.set(
+        rotation.x / 10,
+        rotation.y / 10,
+        rotation.z / 10
+      );
     }
   });
 
-  return <primitive object={scene} position={[0, -1.75, 3]} />
+  return <primitive object={scene} position={[0, -1.75, 3]} />;
 }
 
 function App() {
   const [enableWebcamButtonText, setEnableWebcamButtonText] =
     useState<String>("얼굴 인식 시작하기");
   const [webCamRunning, setWebCamRunning] = useState<Boolean>(false);
-  const [url, setUrl] = useState<string>("https://models.readyplayer.me/6526bcd92537ec63d9a03068.glb?morphTargets=ARKit&textureAtlas=1024");
+  const [url, setUrl] = useState<string>(
+    "https://models.readyplayer.me/6526bcd92537ec63d9a03068.glb?morphTargets=ARKit&textureAtlas=1024"
+  );
 
   // 모델 로드
   const createFaceLandmarker = async () => {
@@ -98,17 +113,26 @@ function App() {
     console.log(nowInMs);
     if (lastVideoTime !== video.currentTime) {
       lastVideoTime = video.currentTime;
-      const faceLandmarkerResult = faceLandmarker.detectForVideo(video, nowInMs);
+      const faceLandmarkerResult = faceLandmarker.detectForVideo(
+        video,
+        nowInMs
+      );
 
-      if (faceLandmarkerResult.faceBlendshapes && faceLandmarkerResult.faceBlendshapes.length > 0 && faceLandmarkerResult.faceBlendshapes[0].categories) {
+      if (
+        faceLandmarkerResult.faceBlendshapes &&
+        faceLandmarkerResult.faceBlendshapes.length > 0 &&
+        faceLandmarkerResult.faceBlendshapes[0].categories
+      ) {
         blendshapes = faceLandmarkerResult.faceBlendshapes[0].categories;
 
-        const matrix = new Matrix4().fromArray(faceLandmarkerResult.facialTransformationMatrixes![0].data);
+        const matrix = new Matrix4().fromArray(
+          faceLandmarkerResult.facialTransformationMatrixes![0].data
+        );
         rotation = new Euler().setFromRotationMatrix(matrix);
       }
     }
     window.requestAnimationFrame(predict);
-  }
+  };
 
   // 카메라 작동
   const enableWebCam = async () => {
@@ -206,7 +230,9 @@ function App() {
           // But for now, we put it here to make it simple.
           blendshapes = faceLandmarkerResult.faceBlendshapes[0].categories;
 
-          const matrix = new Matrix4().fromArray(faceLandmarkerResult.facialTransformationMatrixes![0].data);
+          const matrix = new Matrix4().fromArray(
+            faceLandmarkerResult.facialTransformationMatrixes![0].data
+          );
           rotation = new Euler().setFromRotationMatrix(matrix);
         }
       }
@@ -218,30 +244,57 @@ function App() {
     createFaceLandmarker();
   }, []);
 
+  const avatar_List = [
+    {
+      id: 1,
+      url: "https://models.readyplayer.me/6535fc7531a08a232743c30d.glb?morphTargets=ARKit&textureAtlas=1024&&pose=A",
+    },
+    {
+      id: 2,
+      url: "https://models.readyplayer.me/6535fde535442df22639e5d4.glb?morphTargets=ARKit&textureAtlas=1024&&pose=A",
+    },
+    {
+      id: 3,
+      url: "https://models.readyplayer.me/6536049c31a08a232743ce72.glb?morphTargets=ARKit&textureAtlas=1024&&pose=A",
+    },
+    {
+      id: 4,
+      url: "https://models.readyplayer.me/653604d631a08a232743cea8.glb?morphTargets=ARKit&textureAtlas=1024&&pose=A",
+    },
+  ];
+  const handleClickButton = (number: number) => {
+    const urls = avatar_List.find(({ id }) => id === number);
+    if (urls) {
+      setUrl(urls.url);
+    }
+  };
+
   return (
     <div className="App">
       <div className="content">
         <div className="contentWrapper">
           <div className="cameraWrapper">
-            <video
-              className="video"
-              id="video"
-              autoPlay
-              playsInline
-            ></video>
-            <canvas
-              id="mesh_output_canvas"
-              className="mesh_canvas canvas"
-            />
+            <video className="video" id="video" autoPlay playsInline></video>
+            <canvas id="mesh_output_canvas" className="mesh_canvas canvas" />
           </div>
         </div>
         <div className="contentWrapper">
           <div className="canvasWrapper">
             <div className="output_canvas canvas">
-              <Canvas style={{ height: '100%' }} camera={{ fov: 18 }} shadows>
+              <Canvas style={{ height: "100%" }} camera={{ fov: 18 }} shadows>
                 <ambientLight intensity={0.5} />
-                <pointLight position={[10, 10, 10]} color={new Color(1, 1, 0)} intensity={0.5} castShadow />
-                <pointLight position={[-10, 0, 10]} color={new Color(1, 0, 0)} intensity={0.5} castShadow />
+                <pointLight
+                  position={[10, 10, 10]}
+                  color={new Color(1, 1, 0)}
+                  intensity={0.5}
+                  castShadow
+                />
+                <pointLight
+                  position={[-10, 0, 10]}
+                  color={new Color(1, 0, 0)}
+                  intensity={0.5}
+                  castShadow
+                />
                 <pointLight position={[0, 0, 10]} intensity={0.5} castShadow />
                 <Avatar url={url} />
               </Canvas>
@@ -250,10 +303,15 @@ function App() {
         </div>
       </div>
       <div className="controller">
-        control plain<br />
+        control plain
+        <br />
         {/* Dummy button for now */}
         <button onClick={enableWebCam}>{enableWebcamButtonText}</button>
       </div>
+      <button onClick={() => handleClickButton(1)}>avatar1</button>
+      <button onClick={() => handleClickButton(2)}>avatar2</button>
+      <button onClick={() => handleClickButton(3)}>avatar3</button>
+      <button onClick={() => handleClickButton(4)}>avatar4</button>
     </div>
   );
 }
