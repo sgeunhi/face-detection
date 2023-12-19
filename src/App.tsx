@@ -1,10 +1,18 @@
 import "./App.css";
-
+import * as THREE from "three";
 import React, { useEffect, useState } from "react";
-import { Color, Euler, Matrix4 } from 'three';
-import { Canvas, useFrame, useGraph } from '@react-three/fiber';
-import { FaceLandmarker, DrawingUtils, FilesetResolver, FaceLandmarkerOptions } from "@mediapipe/tasks-vision";
-import { useGLTF } from '@react-three/drei';
+import { Color, Euler, Matrix4 } from "three";
+import { Canvas, useFrame, useGraph } from "@react-three/fiber";
+import {
+  FaceLandmarker,
+  DrawingUtils,
+  FilesetResolver,
+  FaceLandmarkerOptions,
+  Classifications,
+} from "@mediapipe/tasks-vision";
+import NewAvatar from "./class/NewAvatar";
+import BasicScene from "./class/BasicScene";
+import { useGLTF } from "@react-three/drei";
 
 let faceLandmarker: FaceLandmarker;
 let video: HTMLVideoElement;
@@ -14,6 +22,7 @@ let lastVideoTime = -1;
 let blendshapes: any[] = [];
 let rotation: Euler;
 let headMesh: any[] = [];
+let url = "https://assets.codepen.io/9177687/raccoon_head.glb";
 
 const options: FaceLandmarkerOptions = {
   baseOptions: {
@@ -40,8 +49,8 @@ function Avatar({ url }: { url: string }) {
 
   useFrame(() => {
     if (blendshapes.length > 0) {
-      blendshapes.forEach(element => {
-        headMesh.forEach(mesh => {
+      blendshapes.forEach((element) => {
+        headMesh.forEach((mesh) => {
           let index = mesh.morphTargetDictionary[element.categoryName];
           if (index >= 0) {
             mesh.morphTargetInfluences[index] = element.score;
@@ -50,19 +59,130 @@ function Avatar({ url }: { url: string }) {
       });
 
       nodes.Head.rotation.set(rotation.x, rotation.y, rotation.z);
-      nodes.Neck.rotation.set(rotation.x / 5 + 0.3, rotation.y / 5, rotation.z / 5);
-      nodes.Spine2.rotation.set(rotation.x / 10, rotation.y / 10, rotation.z / 10);
+      nodes.Neck.rotation.set(
+        rotation.x / 5 + 0.3,
+        rotation.y / 5,
+        rotation.z / 5
+      );
+      nodes.Spine2.rotation.set(
+        rotation.x / 10,
+        rotation.y / 10,
+        rotation.z / 10
+      );
     }
   });
 
-  return <primitive object={scene} position={[0, -1.75, 3]} />
+  return <primitive object={scene} position={[0, -1.75, 3]} />;
 }
 
 function App() {
+  const url = "https://assets.codepen.io/9177687/raccoon_head.glb";
+  const [videoLoaded, setVideoLoaded] = useState<boolean>(false);
+  const scene = new BasicScene();
+  const avatar = new NewAvatar(url, scene.scene);
   const [enableWebcamButtonText, setEnableWebcamButtonText] =
     useState<String>("얼굴 인식 시작하기");
   const [webCamRunning, setWebCamRunning] = useState<Boolean>(false);
-  const [url, setUrl] = useState<string>("https://models.readyplayer.me/6526bcd92537ec63d9a03068.glb?morphTargets=ARKit&textureAtlas=1024");
+  // const [url, setUrl] = useState<string>(
+  //   "https://models.readyplayer.me/6526bcd92537ec63d9a03068.glb?morphTargets=ARKit&textureAtlas=1024"
+  // );
+
+  function detectFaceLandmarks(time: DOMHighResTimeStamp): void {
+    if (!faceLandmarker) {
+      return;
+    }
+    const landmarks = faceLandmarker.detectForVideo(video, time);
+
+    // Apply transformation
+    const transformationMatrices = landmarks.facialTransformationMatrixes;
+    if (transformationMatrices && transformationMatrices.length > 0) {
+      let matrix = new THREE.Matrix4().fromArray(
+        transformationMatrices[0].data
+      );
+      // Example of applying matrix directly to the avatar
+      if (avatar) {
+        avatar.applyMatrix(matrix, { scale: 40 });
+      }
+    }
+
+    // Apply Blendshapes
+    const blendshapes = landmarks.faceBlendshapes;
+    if (blendshapes && blendshapes.length > 0) {
+      const coefsMap = retarget(blendshapes);
+      avatar.updateBlendshapes(coefsMap);
+    }
+  }
+
+  function retarget(blendshapes: Classifications[]) {
+    const categories = blendshapes[0].categories;
+    let coefsMap = new Map<string, number>();
+    for (let i = 0; i < categories.length; ++i) {
+      const blendshape = categories[i];
+      // Adjust certain blendshape values to be less prominent.
+      switch (blendshape.categoryName) {
+        case "browOuterUpLeft":
+          blendshape.score *= 1.2;
+          break;
+        case "browOuterUpRight":
+          blendshape.score *= 1.2;
+          break;
+        case "eyeBlinkLeft":
+          blendshape.score *= 1.2;
+          break;
+        case "eyeBlinkRight":
+          blendshape.score *= 1.2;
+          break;
+        default:
+      }
+      coefsMap.set(categories[i].categoryName, categories[i].score);
+    }
+    return coefsMap;
+  }
+
+  function onVideoFrame(time: DOMHighResTimeStamp): void {
+    // Do something with the frame.
+    detectFaceLandmarks(time);
+    // Re-register the callback to be notified about the next frame.
+    video.requestVideoFrameCallback(onVideoFrame);
+  }
+
+  async function streamWebcamThroughFaceLandmarker(): Promise<void> {
+    console.log("Before video assignment:", video);
+    video = document.getElementById("video") as HTMLVideoElement;
+    console.log("After video assignment:", video);
+
+    if (!video) {
+      console.error("Video element not found");
+      return;
+    }
+
+    function onAcquiredUserMedia(stream: MediaStream): void {
+      video.srcObject = stream;
+      video.onloadedmetadata = () => {
+        video.play();
+
+        if (video) {
+          video.requestVideoFrameCallback(onVideoFrame);
+          setVideoLoaded(true);
+        }
+      };
+    }
+
+    try {
+      const evt = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: "user",
+          width: 1280,
+          height: 720,
+        },
+      });
+      onAcquiredUserMedia(evt);
+      video.requestVideoFrameCallback(onVideoFrame);
+    } catch (e: unknown) {
+      console.error(`Failed to acquire camera feed: ${e}`);
+    }
+  }
 
   // 모델 로드
   const createFaceLandmarker = async () => {
@@ -70,45 +190,64 @@ function App() {
       "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
     );
 
+    video = document.getElementById("video") as HTMLVideoElement;
+
     faceLandmarker = await FaceLandmarker.createFromOptions(
       filesetResolver,
       options
     );
 
-    video = document.getElementById("video") as HTMLVideoElement;
     const constraints = {
       video: true,
       audio: false,
     };
-    navigator.mediaDevices.getUserMedia(constraints).then((stream) => {
-      video.srcObject = stream;
-      video.addEventListener("loadeddata", predictWebCam);
 
-      // To seperate the logic of the drawing head mesh and the logic of the updating avatar,
-      // Uncomment the following line and comment the same part in the predictWebCam function.
+    if (!videoLoaded) {
+      video.addEventListener("loadeddata", () => {
+        streamWebcamThroughFaceLandmarker();
+      });
+    } else {
+      streamWebcamThroughFaceLandmarker();
+    }
 
-      // video.addEventListener("loadeddata", predict);
-    });
+    // navigator.mediaDevices.getUserMedia(constraints).then((stream) => {
+    //   video.srcObject = stream;
+    //   video.addEventListener("loadeddata", streamWebcamThroughFaceLandmarker);
+
+    //   // To seperate the logic of the drawing head mesh and the logic of the updating avatar,
+    //   // Uncomment the following line and comment the same part in the predictWebCam function.
+
+    //   // video.addEventListener("loadeddata", predict);
+    // });
   };
 
   // Avatar update function which is called every frame.
   // But for not, integrate this function with the predictWebCam function for the simplicity and performance.
-  const predict = async () => {
-    let nowInMs = Date.now();
-    console.log(nowInMs);
-    if (lastVideoTime !== video.currentTime) {
-      lastVideoTime = video.currentTime;
-      const faceLandmarkerResult = faceLandmarker.detectForVideo(video, nowInMs);
+  // const predict = async () => {
+  //   let nowInMs = Date.now();
+  //   console.log(nowInMs);
+  //   if (lastVideoTime !== video.currentTime) {
+  //     lastVideoTime = video.currentTime;
+  //     const faceLandmarkerResult = faceLandmarker.detectForVideo(
+  //       video,
+  //       nowInMs
+  //     );
 
-      if (faceLandmarkerResult.faceBlendshapes && faceLandmarkerResult.faceBlendshapes.length > 0 && faceLandmarkerResult.faceBlendshapes[0].categories) {
-        blendshapes = faceLandmarkerResult.faceBlendshapes[0].categories;
+  //     if (
+  //       faceLandmarkerResult.faceBlendshapes &&
+  //       faceLandmarkerResult.faceBlendshapes.length > 0 &&
+  //       faceLandmarkerResult.faceBlendshapes[0].categories
+  //     ) {
+  //       blendshapes = faceLandmarkerResult.faceBlendshapes[0].categories;
 
-        const matrix = new Matrix4().fromArray(faceLandmarkerResult.facialTransformationMatrixes![0].data);
-        rotation = new Euler().setFromRotationMatrix(matrix);
-      }
-    }
-    window.requestAnimationFrame(predict);
-  }
+  //       const matrix = new Matrix4().fromArray(
+  //         faceLandmarkerResult.facialTransformationMatrixes![0].data
+  //       );
+  //       rotation = new Euler().setFromRotationMatrix(matrix);
+  //     }
+  //   }
+  //   window.requestAnimationFrame(predict);
+  // };
 
   // 카메라 작동
   const enableWebCam = async () => {
@@ -206,7 +345,9 @@ function App() {
           // But for now, we put it here to make it simple.
           blendshapes = faceLandmarkerResult.faceBlendshapes[0].categories;
 
-          const matrix = new Matrix4().fromArray(faceLandmarkerResult.facialTransformationMatrixes![0].data);
+          const matrix = new Matrix4().fromArray(
+            faceLandmarkerResult.facialTransformationMatrixes![0].data
+          );
           rotation = new Euler().setFromRotationMatrix(matrix);
         }
       }
@@ -216,32 +357,39 @@ function App() {
 
   useEffect(() => {
     createFaceLandmarker();
-  }, []);
+  }, [videoLoaded]);
 
   return (
     <div className="App">
       <div className="content">
         <div className="contentWrapper">
           <div className="cameraWrapper">
-            <video
-              className="video"
-              id="video"
-              autoPlay
-              playsInline
-            ></video>
-            <canvas
-              id="mesh_output_canvas"
-              className="mesh_canvas canvas"
-            />
+            <video className="video" id="video" autoPlay playsInline></video>
+            {/* <BasicScene video={video} />
+            <NewAvatar
+              url="https://assets.codepen.io/9177687/raccoon_head.glb"
+              scene={scene}
+            /> */}
+            <canvas id="mesh_output_canvas" className="mesh_canvas canvas" />
           </div>
         </div>
         <div className="contentWrapper">
           <div className="canvasWrapper">
             <div className="output_canvas canvas">
-              <Canvas style={{ height: '100%' }} camera={{ fov: 18 }} shadows>
+              <Canvas style={{ height: "100%" }} camera={{ fov: 18 }} shadows>
                 <ambientLight intensity={0.5} />
-                <pointLight position={[10, 10, 10]} color={new Color(1, 1, 0)} intensity={0.5} castShadow />
-                <pointLight position={[-10, 0, 10]} color={new Color(1, 0, 0)} intensity={0.5} castShadow />
+                <pointLight
+                  position={[10, 10, 10]}
+                  color={new Color(1, 1, 0)}
+                  intensity={0.5}
+                  castShadow
+                />
+                <pointLight
+                  position={[-10, 0, 10]}
+                  color={new Color(1, 0, 0)}
+                  intensity={0.5}
+                  castShadow
+                />
                 <pointLight position={[0, 0, 10]} intensity={0.5} castShadow />
                 <Avatar url={url} />
               </Canvas>
@@ -250,7 +398,8 @@ function App() {
         </div>
       </div>
       <div className="controller">
-        control plain<br />
+        control plain
+        <br />
         {/* Dummy button for now */}
         <button onClick={enableWebCam}>{enableWebcamButtonText}</button>
       </div>
