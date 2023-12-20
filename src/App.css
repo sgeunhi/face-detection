@@ -5,8 +5,9 @@
   flex-direction: column;
 }
 
-body > #root > div {
-  height: 100vh;
+body > #root {
+  visibility: hidden;
+  height: 0px;
 }
 
 .content {
