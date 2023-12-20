@@ -41,7 +41,7 @@ class BasicScene {
   lastTime: number = 0;
   callbacks: RenderCallback[] = [];
 
-  constructor() {
+  constructor(video: HTMLVideoElement) {
     // Initialize the canvas with the same aspect ratio as the video input
     this.height = window.innerHeight;
     this.width = (this.height * 1280) / 720;
@@ -76,11 +76,11 @@ class BasicScene {
     this.controls.update();
 
     // Add a video background
-    const video = document.getElementById("video") as HTMLVideoElement;
+    // const video = document.getElementById("video") as HTMLVideoElement;
 
-    if (!video) {
-      console.log("No video element found!");
-    }
+    // if (!video) {
+    //   console.log("No video element found!");
+    // }
 
     const inputFrameTexture = new THREE.VideoTexture(video);
     if (!inputFrameTexture) {

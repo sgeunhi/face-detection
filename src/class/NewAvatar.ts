@@ -59,7 +59,7 @@ class NewAvatar {
       }
       // Return early if no mesh is found.
       if (!(object as THREE.Mesh).isMesh) {
-        // console.warn(`No mesh found`);
+        console.warn(`No mesh found`);
         return;
       }
 
@@ -94,6 +94,7 @@ class NewAvatar {
       }
     }
   }
+
   applyMatrix(
     matrix: THREE.Matrix4,
     matrixRetargetOptions?: MatrixRetargetOptions

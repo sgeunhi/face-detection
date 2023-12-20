@@ -33,7 +33,7 @@ function App() {
     video = document.getElementById("video") as HTMLVideoElement;
 
     if (video) {
-      scene = new BasicScene();
+      scene = new BasicScene(video);
       avatar = new NewAvatar(url, scene.scene);
     }
     createFaceLandmarker();
@@ -100,7 +100,7 @@ function App() {
   }
 
   async function streamWebcamThroughFaceLandmarker() {
-    video = document.getElementById("video") as HTMLVideoElement;
+    // video = document.getElementById("video") as HTMLVideoElement;
 
     function onAcquiredUserMedia(stream: MediaStream) {
       video.srcObject = stream;
